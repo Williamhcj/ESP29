@@ -1,0 +1,31 @@
+// Task 2 Driving Both Motors at Different Speeds
+#include "mbed.h"
+
+// Motor drive board signals:
+DigitalOut Bipolar(PC_8);
+DigitalOut enable(PC_5);
+PwmOut motor_speed(PC_4);    // Motor 1 PWM
+DigitalOut Bipolar2(PC_12);
+PwmOut motor_speed2(PC_11);  // Motor 2 PWM
+
+int main() {
+    enable = 1;
+    Bipolar = 1;
+    Bipolar2 = 1;
+    
+    // Set PWM period to 1 ms (1 kHz PWM frequency).
+    motor_speed.period_ms(1);
+    motor_speed2.period_ms(1);
+    
+    while(1) {
+        // Drive Motor 1 at 40% duty cycle and Motor 2 at 70% duty cycle.
+        motor_speed.write(0.4f);
+        motor_speed2.write(0.7f);
+        wait_ms(2000);
+        
+        // Then change speeds: Motor 1 at 60% duty cycle, Motor 2 at 30% duty cycle.
+        motor_speed.write(0.6f);
+        motor_speed2.write(0.3f);
+        wait_ms(2000);
+    }
+}

@@ -2,10 +2,12 @@
 
 #include "mbed.h"
 
+C12832 lcd(D11, D13, D12, D7, D10);
+
 // Motor drive signals (from your sample code; they might not be used in this task).
 DigitalOut Bipolar(PC_8);
 DigitalOut enable(PC_5);
-PwmOut motor_speed(PC_4);
+PwmOut motor_speed(PC_6);
 DigitalOut Bipolar2(PC_12);
 PwmOut motor_speed2(PC_11);
 
@@ -34,7 +36,8 @@ int main() {
     encoderIn.fall(&encoderCallback);
     
     while(1) {
-        pc.printf("Encoder Count: %d\r\n", encoderCount);
+        lcd.locate(30, 1);
+        lcd.printf("Encoder Count: %d\r\n", encoderCount);
         wait_ms(500);
     }
 }

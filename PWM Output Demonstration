@@ -1,0 +1,38 @@
+// This is what i think works for the PWM Output Demonstration
+#include "mbed.h"
+
+// These objects control motor drive signals:
+DigitalOut Bipolar(PC_8);
+DigitalOut enable(PC_5);
+PwmOut motor_speed(PC_4);    // PWM channel for Motor 1
+
+DigitalOut Bipolar2(PC_12);
+PwmOut motor_speed2(PC_11);  // PWM channel for Motor 2
+
+int main() {
+    // Turn on the drive board and set polarity.
+    enable = 1;
+    Bipolar = 1;
+    Bipolar2 = 1;
+    
+    // Set a PWM period. (For example, a 1 kHz PWM frequency = 1ms period.)
+    motor_speed.period_ms(1);
+    motor_speed2.period_ms(1);
+    
+    while(1) {
+        // Example 1: Motor 1 at 20% duty cycle, Motor 2 at 80% duty cycle.
+        motor_speed.write(0.2f);
+        motor_speed2.write(0.8f);
+        wait_ms(1000);
+        
+        // Example 2: Both motors at 50% duty cycle.
+        motor_speed.write(0.5f);
+        motor_speed2.write(0.5f);
+        wait_ms(1000);
+        
+        // Example 3: Motor 1 at 80% duty cycle, Motor 2 at 20% duty cycle.
+        motor_speed.write(0.8f);
+        motor_speed2.write(0.2f);
+        wait_ms(1000);
+    }
+}

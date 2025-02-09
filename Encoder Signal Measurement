@@ -1,0 +1,40 @@
+// Encoder Signal Measurements
+
+#include "mbed.h"
+
+// Motor drive signals (from your sample code; they might not be used in this task).
+DigitalOut Bipolar(PC_8);
+DigitalOut enable(PC_5);
+PwmOut motor_speed(PC_4);
+DigitalOut Bipolar2(PC_12);
+PwmOut motor_speed2(PC_11);
+
+// Use the USB serial port for output.
+Serial pc(USBTX, USBRX);
+
+// Global encoder counter.
+volatile int encoderCount = 0;
+
+// Set up an InterruptIn for the encoder signal (assumed here on PC_13).
+InterruptIn encoderIn(PC_13);
+
+// Callback function called on each rising and falling edge.
+void encoderCallback() {
+    encoderCount++;  // For demonstration, increment on every edge.
+}
+
+int main() {
+    // (Optional) Initialize motor signals if needed.
+    enable = 1;
+    Bipolar = 1;
+    Bipolar2 = 1;
+    
+    // Attach the interrupt callback to both rising and falling edges.
+    encoderIn.rise(&encoderCallback);
+    encoderIn.fall(&encoderCallback);
+    
+    while(1) {
+        pc.printf("Encoder Count: %d\r\n", encoderCount);
+        wait_ms(500);
+    }
+}

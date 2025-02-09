@@ -103,7 +103,7 @@ public:
 // Motor drive control signals
 DigitalOut Bipolar(PC_8);
 DigitalOut enable(PC_5);
-PwmOut motor_speed(PC_4);    // PWM channel for Motor 1
+PwmOut motor_speed(PC_6);    // PWM channel for Motor 1
 PwmOut motor_speed2(PC_11);  // PWM channel for Motor 2
 
 // Create a SamplingPotentiometer for motor speed control (adjust A4 if needed)

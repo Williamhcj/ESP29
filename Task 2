@@ -4,7 +4,7 @@
 // Motor drive board signals:
 DigitalOut Bipolar(PC_8);
 DigitalOut enable(PC_5);
-PwmOut motor_speed(PC_4);    // Motor 1 PWM
+PwmOut motor_speed(PC_6);    // Motor 1 PWM
 DigitalOut Bipolar2(PC_12);
 PwmOut motor_speed2(PC_11);  // Motor 2 PWM
 

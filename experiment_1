@@ -1,0 +1,182 @@
+#include "mbed.h"
+#include "C12832.h"   // Library for the graphic LCD
+
+// =============================================================
+// Class Definitions (from your previous code)
+// =============================================================
+
+class LED {
+protected:
+    DigitalOut outputSignal;
+    bool status;
+public:
+    LED(PinName pin) : outputSignal(pin) {
+        off(); // Initialise LED as off
+    }
+    void on(void) {
+        outputSignal = 0; // Active low
+        status = true;
+    }
+    void off(void) {
+        outputSignal = 1;
+        status = false;
+    }
+    void toggle(void) {
+        if(status)
+            off();
+        else
+            on();
+    }
+    bool getStatus(void) {
+        return status;
+    }
+};
+
+class Potentiometer {
+private:
+    AnalogIn inputSignal;
+    float VDD, currentSampleNorm, currentSampleVolts;
+public:
+    Potentiometer(PinName pin, float v) : inputSignal(pin), VDD(v) {}
+    float amplitudeVolts(void) {
+        return (inputSignal.read() * VDD);
+    }
+    float amplitudeNorm(void) {
+        return inputSignal.read();
+    }
+    void sample(void) {
+        currentSampleNorm = inputSignal.read();
+        currentSampleVolts = currentSampleNorm * VDD;
+    }
+    const float getCurrentSampleNorm(void) {
+        return currentSampleNorm;
+    }
+    const float getCurrentSampleVolts(void) {
+        return currentSampleVolts;
+    }
+};
+
+class SamplingPotentiometer : public Potentiometer {
+private:
+    float samplingFrequency, samplingPeriod;
+    Ticker sampler;
+public:
+    SamplingPotentiometer(PinName p, float v, float fs) : Potentiometer(p, v) {
+        samplingFrequency = fs;
+        samplingPeriod = 1.0f / samplingFrequency;
+        // Attach a ticker to update the sample periodically.
+        sampler.attach(callback(this, &SamplingPotentiometer::sample), samplingPeriod);
+    }
+};
+
+class Buzzer {
+protected:
+    DigitalOut outputSignal;
+    bool status;
+public:
+    Buzzer(PinName pin) : outputSignal(pin) {
+        off();
+    }
+    void on(void) {
+        outputSignal = 1;
+        status = true;
+    }
+    void off(void) {
+        outputSignal = 0;
+        status = false;
+    }
+    void toggle(void) {
+        if(status)
+            off();
+        else
+            on();
+    }
+    bool getStatus(void) {
+        return status;
+    }
+};
+
+// =============================================================
+// Hardware Objects and Global Variables
+// =============================================================
+
+// Motor drive control signals
+DigitalOut Bipolar(PC_8);
+DigitalOut enable(PC_5);
+PwmOut motor_speed(PC_4);    // PWM channel for Motor 1
+PwmOut motor_speed2(PC_11);  // PWM channel for Motor 2
+
+// Create a SamplingPotentiometer for motor speed control (adjust A4 if needed)
+SamplingPotentiometer motorPot(A4, 3.3, 5);
+
+// Create the LCD object.
+// (Constructor order: cs, reset, dc, mosi, sclk; adjust these pins to match your wiring)
+C12832 lcd(D11, D13, D12, D7, D10);
+
+// Use an InterruptIn for the fire button (to start/stop the motors)
+InterruptIn fireButton(D4);
+
+// Define a simple state machine:
+enum SystemState { IDLE, FIRING };
+volatile SystemState sys_state = IDLE;   // Start in the IDLE (speed‑setting) state
+volatile float latchedSpeed = 0.0f;        // This will hold the speed at which to run the motors
+
+// =============================================================
+// Fire Button ISR: Toggle between IDLE and FIRING states
+// =============================================================
+void firePressed() {
+    if (sys_state == IDLE) {
+        // Latch the current potentiometer reading as the motor speed
+        latchedSpeed = motorPot.getCurrentSampleNorm();
+        sys_state = FIRING;
+    } else {
+        // Return to idle; stop the motors.
+        sys_state = IDLE;
+    }
+}
+
+// =============================================================
+// Main Function
+// =============================================================
+int main() {
+    // Set up motor PWM period (e.g. 1ms period gives ~1 kHz frequency)
+    motor_speed.period_ms(1);
+    motor_speed2.period_ms(1);
+    
+    // Initialise motor control signals
+    enable = 1;
+    Bipolar = 1;
+    
+    // Briefly display a welcome message
+    lcd.cls();
+    lcd.locate(0,0);
+    lcd.printf("Set Motor Speed");
+    wait_ms(1000);
+    
+    // Attach the fire button ISR to a rising edge.
+    fireButton.rise(&firePressed);
+    
+    while (1) {
+        // Read the current potentiometer value (0.0 to 1.0)
+        float currentSpeed = motorPot.getCurrentSampleNorm();
+        
+        if (sys_state == IDLE) {
+            // In the idle state, update the LCD to show the set speed.
+            lcd.cls();
+            lcd.locate(0,0);
+            lcd.printf("Set Speed:\n%3.0f%%", currentSpeed * 100);
+            // Ensure the motors are off.
+            motor_speed.write(0.0f);
+            motor_speed2.write(0.0f);
+        } else if (sys_state == FIRING) {
+            // In the firing state, run the motors at the latched speed.
+            lcd.cls();
+            lcd.locate(0,0);
+            lcd.printf("Motor Running:\n%3.0f%%", latchedSpeed * 100);
+            motor_speed.write(latchedSpeed);
+            motor_speed2.write(latchedSpeed);
+        }
+        
+        wait_ms(100);  // Update the display every 100 ms
+    }
+}

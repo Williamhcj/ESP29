@@ -1,0 +1,172 @@
+// Task 6 
+//Need to go in a square
+
+#include "mbed.h"
+#include "C12832.h"
+
+C12832 lcd(D11, D13, D12, D7, D10);
+
+// Motor drive board signals:
+DigitalOut Bipolar(PC_8);       // Used for motor polarity/direction (Motor 1)
+DigitalOut enable(PC_5);        // Enable signal for the drive board
+PwmOut motor_speed(PC_6);       // PWM for Motor 1
+
+DigitalOut Bipolar2(PC_12);     // Used for motor polarity/direction (Motor 2)
+PwmOut motor_speed2(PC_11);     // PWM for Motor 2
+
+// Encoder input and serial output for debugging.
+InterruptIn encoderIn(PC_13);
+Serial pc(USBTX, USBRX);
+volatile int encoderCount = 0;
+
+// Encoder callback (called on every edge).
+void encoderCallback(){
+    encoderCount++;
+}
+
+// Define state machine states.
+enum MotionState {
+    SQUARE_FORWARD,  // Drive forward for one side
+    TURN,            // Execute a 90° turn at the side's end
+    STOP,            // Stop at the starting position after the square
+    TURN_AROUND,     // Perform a 180° turn to reverse direction
+    SQUARE_RETRACE,  // Retrace the square in reverse
+    DONE             // Finished operation
+};
+
+MotionState state = SQUARE_FORWARD;
+int sideCount = 0;       // Number of sides completed
+int turnCounter = 0;     // Counter used to simulate the duration of a turn
+int stopCounter = 0;     // Counter used during the stop state
+
+// Calibration constants (adjust these based on your robot’s characteristics):
+const int targetForwardCount = 1000;     // Encoder counts corresponding to ~0.5 m travel
+const int turnDelayThreshold    = 100;     // Loop iterations for a 90° turn
+const int stopDelayThreshold    = 50;      // Loop iterations to pause at start
+const int turnAroundThreshold   = 200;     // Loop iterations for a 180° turn
+const float forwardDuty = 0.5f;            // PWM duty cycle for forward motion
+const float turnDuty    = 0.3f;            // PWM duty cycle during turns
+
+// Function to set motor direction.
+// For this example, setting Bipolar and Bipolar2 to 1 means “forward” and 0 means “reverse.”
+void setMotorDirection(bool forward) {
+    Bipolar = forward ? 1 : 0;
+    Bipolar2 = forward ? 1 : 0;
+}
+
+int main() {
+    // Initial setup.
+    enable = 1;
+    setMotorDirection(true);
+    
+    // Set PWM period (e.g., 1 kHz).
+    motor_speed.period_ms(1);
+    motor_speed2.period_ms(1);
+    
+    // Setup encoder interrupts.
+    encoderIn.rise(&encoderCallback);
+    encoderIn.fall(&encoderCallback);
+    
+    lcd.locate(30, 1);
+    lcd.printf("Buggy starting...\r\n");
+    
+    bool forwardMode = true;  // 'true' during the first square, 'false' during retrace.
+    
+    while(1) {
+        switch(state) {
+            case SQUARE_FORWARD:
+                setMotorDirection(true);
+                // Drive both motors at forward speed.
+                motor_speed.write(forwardDuty);
+                motor_speed2.write(forwardDuty);
+                // When the encoder count indicates ~0.5 m travel, change state.
+                if (encoderCount >= targetForwardCount) {
+                    encoderCount = 0;
+                    state = TURN;
+                    turnCounter = 0;
+                    lcd.locate(30, 1);
+                    lcd.printf("Completed side %d, turning...\r\n", sideCount + 1);
+                }
+                break;
+                
+            case TURN:
+                // To simulate a 90° turn, run one motor slower (or off).
+                motor_speed.write(turnDuty);
+                motor_speed2.write(0.0f);
+                turnCounter++;
+                if (turnCounter >= turnDelayThreshold) {
+                    sideCount++;
+                    if (forwardMode) {
+                        if (sideCount >= 4) {
+                            state = STOP;
+                            stopCounter = 0;
+                            lcd.locate(30, 1);
+                            lcd.printf("Square complete, stopping at start.\r\n");
+                        } else {
+                            state = SQUARE_FORWARD;
+                        }
+                    } else {  // Retrace mode.
+                        if (sideCount >= 4) {
+                            state = DONE;
+                            lcd.locate(30, 1);
+                            lcd.printf("Retrace complete, done.\r\n");
+                        } else {
+                            state = SQUARE_RETRACE;
+                        }
+                    }
+                }
+                break;
+                
+            case STOP:
+                // Stop both motors.
+                motor_speed.write(0.0f);
+                motor_speed2.write(0.0f);
+                stopCounter++;
+                if (stopCounter >= stopDelayThreshold) {
+                    state = TURN_AROUND;
+                    turnCounter = 0;
+                    lcd.locate(30, 1);
+                    lcd.printf("Turning around...\r\n");
+                }
+                break;
+                
+            case TURN_AROUND:
+                // Execute a 180° turn.
+                motor_speed.write(turnDuty);
+                motor_speed2.write(0.0f);
+                turnCounter++;
+                if (turnCounter >= turnAroundThreshold) {
+                    // Change direction for retrace.
+                    forwardMode = false;
+                    sideCount = 0;
+                    encoderCount = 0;
+                    setMotorDirection(false); // Set to reverse.
+                    state = SQUARE_RETRACE;
+                    turnCounter = 0;
+                    lcd.locate(30, 1);
+                    lcd.printf("Now retracing the square...\r\n");
+                }
+                break;
+                
+            case SQUARE_RETRACE:
+                // Drive in reverse (using the reverse direction set above) at forward speed.
+                motor_speed.write(forwardDuty);
+                motor_speed2.write(forwardDuty);
+                if (encoderCount >= targetForwardCount) {
+                    encoderCount = 0;
+                    state = TURN;
+                    turnCounter = 0;
+                    lcd.locate(30, 1);
+                    lcd.printf("Completed retrace side %d, turning...\r\n", sideCount + 1);
+                }
+                break;
+                
+            case DONE:
+                // Finished – stop both motors.
+                motor_speed.write(0.0f);
+                motor_speed2.write(0.0f);
+                break;
+        }
+        wait_ms(10);
+    }
+}

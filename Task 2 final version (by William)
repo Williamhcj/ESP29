@@ -1,0 +1,50 @@
+#include "mbed.h"
+#include "C12832.h"
+
+
+DigitalOut enable(PA_14);           
+DigitalOut directionMotor1(PA_13);  
+DigitalOut directionMotor2(PC_12);  
+
+PwmOut motor_speed1(PC_6);  
+PwmOut motor_speed2(PC_8);  
+
+
+AnalogIn pot1(A0);  
+AnalogIn pot2(A1); 
+
+
+C12832 lcd(D11, D13, D12, D7, D10);
+
+
+int main()
+{
+    enable = 1;
+
+   
+    directionMotor1 = 0;
+    directionMotor2 = 0;
+
+    motor_speed1.period_us(50);
+    motor_speed2.period_us(50);
+
+   
+    motor_speed1.write(0.0f);
+    motor_speed2.write(0.0f);
+
+    while (true) {
+        
+        float potVal1 = pot1.read();
+        float potVal2 = pot2.read();
+
+       
+        motor_speed1.write(potVal1);
+        motor_speed2.write(potVal2);
+
+       
+        lcd.locate(0, 0);
+        lcd.printf("Motor1=%.2f  Motor2=%.2f", potVal1, potVal2);
+
+        wait(0.1);
+    }
+}

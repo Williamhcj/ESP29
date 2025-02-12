@@ -1,0 +1,81 @@
+#include "mbed.h"
+#include "C12832.h"
+#include "QEI.h"
+
+
+
+// C12832 LCD (Mbed Application Shield)
+C12832 lcd(D11, D13, D12, D7, D10);
+
+// LED to flash when the encoder value changes
+DigitalOut led(D5);
+
+
+#define ENC_A PA_2
+#define ENC_B PA_3
+#define ENC_Z NC  // Not connected if you don't use the index
+
+// Ticker for measuring speed each second
+Ticker speedSampler;
+
+// Adjust to match your encoder
+const int pulsesPerRevolution = 360;  // e.g., 360 PPR
+
+
+QEI wheel(ENC_A, ENC_B, ENC_Z, pulsesPerRevolution, QEI::X2_ENCODING);
+
+
+void measureSpeed() {
+    static int oldCount = 0;
+
+    int newCount = wheel.getPulses();
+    int delta    = newCount - oldCount;
+    oldCount     = newCount;
+
+    // pulses/second
+    float rps = float(delta) / float(pulsesPerRevolution); // revolutions per second
+    float rpm = rps * 60.0f;                               // revolutions per minute
+
+    lcd.cls();
+    lcd.locate(0, 0);
+    lcd.printf("Pulses: %d", newCount);
+
+    lcd.locate(0, 10);
+    lcd.printf("RPM: %.2f", rpm);
+}
+
+// ------------------- Main -------------------
+int main() {
+ 
+    wheel.reset();  // zero out any previous counts
+
+   
+    speedSampler.attach(&measureSpeed, 1.0f);
+
+    // Show a startup message
+    lcd.cls();
+    lcd.locate(0,0);
+    lcd.printf("QEI Encoder Demo");
+
+  
+    int previousCount = wheel.getPulses();
+
+  
+    while (true) {
+       
+        int currentCount = wheel.getPulses();
+        if (currentCount != previousCount) {
+          
+            led = !led;
+
+    
+            lcd.locate(0, 20);
+            lcd.printf("Hand Move!    ");
+
+            previousCount = currentCount;
+        }
+
+        // A brief pause to avoid overly rapid polling
+        wait(0.1f);
+    }
+}

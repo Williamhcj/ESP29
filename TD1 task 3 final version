@@ -1,0 +1,114 @@
+#include "mbed.h"
+#include "C12832.h"
+
+
+InterruptIn enc1A(PA_10);
+InterruptIn enc1B(PB_3);
+
+// Encoder #2
+InterruptIn enc2A(PC_0);
+InterruptIn enc2B(PC_1);
+
+
+C12832 lcd(D11, D13, D12, D7, D10);
+
+
+volatile int enc1Position = 0;
+volatile int enc2Position = 0;
+
+
+const int pulsesPerRevolution = 360;
+
+
+void enc1A_rise() {
+
+    if (enc1A.read() == enc1B.read()) {
+        enc1Position++;
+    } else {
+        enc1Position--;
+    }
+}
+
+void enc1B_rise() {
+    if (enc1A.read() != enc1B.read()) {
+        enc1Position++;
+    } else {
+        enc1Position--;
+    }
+}
+
+// ------------------ Encoder 2 Quadrature Interrupts ------------------
+void enc2A_rise() {
+    if (enc2A.read() == enc2B.read()) {
+        enc2Position++;
+    } else {
+        enc2Position--;
+    }
+}
+
+void enc2B_rise() {
+    if (enc2A.read() != enc2B.read()) {
+        enc2Position++;
+    } else {
+        enc2Position--;
+    }
+}
+Ticker speedSampler;
+
+// We'll keep track of the old counts to see how many pulses
+// happened in the past 1 second (delta).
+void measureSpeed() {
+    static int oldEnc1 = 0;
+    static int oldEnc2 = 0;
+
+    // Copy the volatile counters
+    int newEnc1 = enc1Position;
+    int newEnc2 = enc2Position;
+
+    // Find how many pulses occurred in the last 1 second
+    int delta1 = newEnc1 - oldEnc1;
+    int delta2 = newEnc2 - oldEnc2;
+
+    // Update old values
+    oldEnc1 = newEnc1;
+    oldEnc2 = newEnc2;
+
+    // pulses per second => revolutions per second => RPM
+    float rps1 = float(delta1) / float(pulsesPerRevolution);
+    float rpm1 = rps1 * 60.0f;
+
+    float rps2 = float(delta2) / float(pulsesPerRevolution);
+    float rpm2 = rps2 * 60.0f;
+
+    // Display both pulses and RPM for each encoder
+    lcd.cls();
+    lcd.locate(0, 0);
+    lcd.printf("Enc1: pulses=%d  RPM=%.1f", newEnc1, rpm1);
+
+    lcd.locate(0, 10);
+    lcd.printf("Enc2: pulses=%d  RPM=%.1f", newEnc2, rpm2);
+}
+
+// ------------------ Main Program ------------------
+int main() {
+    // Optional: enable internal pull-ups (if encoders are open-drain)
+    enc1A.mode(PullUp);
+    enc1B.mode(PullUp);
+    enc2A.mode(PullUp);
+    enc2B.mode(PullUp);
+
+    
+    enc1A.rise(&enc1A_rise);
+    enc1B.rise(&enc1B_rise);
+    enc2A.rise(&enc2A_rise);
+    enc2B.rise(&enc2B_rise);
+
+    // Call measureSpeed() once per second
+    speedSampler.attach(&measureSpeed, 1.0f);
+
+    // Simple loop doing nothing else
+    while (true) {
+        // Sleep or wait to reduce CPU usage
+        wait(0.1f);
+    }
+}
